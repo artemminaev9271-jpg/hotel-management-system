@@ -1,4 +1,8 @@
 import customtkinter as CTk
+import requests
+from tkinter import messagebox
+
+SERVER_URL = "http://127.0.0.1:8000"
 
 class Nav_plane(CTk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
@@ -81,26 +85,48 @@ class Register_window(CTk.CTkFrame):
         self.first_name_lable = CTk.CTkLabel(master=self, text="Имя:", font=("", 15), anchor=CTk.CENTER)
         self.first_name_lable.place(anchor=CTk.E, relx=0.2, rely=0.3)
 
-        self.first_name_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.first_name_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.first_name_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.3)
 
         self.last_name_lable = CTk.CTkLabel(master=self, text="Фамилия:", font=("", 15), anchor=CTk.CENTER)
         self.last_name_lable.place(anchor=CTk.E, relx=0.2, rely=0.4)
 
-        self.last_name_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.last_name_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.last_name_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.4)
 
         self.email_lable = CTk.CTkLabel(master=self, text="Почта:", font=("", 15), anchor=CTk.CENTER)
         self.email_lable.place(anchor=CTk.E, relx=0.2, rely=0.5)
 
-        self.email_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.email_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.email_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.5)
 
         self.password_lable = CTk.CTkLabel(master=self, text="Пароль:", font=("", 15), anchor=CTk.CENTER)
         self.password_lable.place(anchor=CTk.E, relx=0.2, rely=0.6)
 
-        self.password_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.password_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.password_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.6)
+
+        self.btn_submit = CTk.CTkButton(master=self, text="Зарегистрироваться", font=("", 15, "bold"), command=self.register)
+        self.btn_submit.place(anchor=CTk.CENTER, relx=0.5, rely=0.7)
+
+    def register(self):
+        data = {
+            "first_name": self.first_name_textbox.get(),
+            "last_name": self.last_name_textbox.get(),
+            "email": self.email_textbox.get(),
+            "password": self.password_textbox.get()
+        }
+
+        try:
+            response = requests.post(f"{SERVER_URL}/register/", json=data)
+
+            if response.status_code == 200:
+                messagebox.showinfo("Успех", "Вы успешно зарегистрированы!")
+            else:
+                error_msg = response.json().get("detail", "Ошибка регистрации")
+                messagebox.showerror("Ошибка", error_msg)
+        except requests.exceptions.ConnectionError:
+            messagebox.showerror("Ошибка", "Сервер недоступен. Запустите сервер!")
 
 class Login_window(CTk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
@@ -117,13 +143,13 @@ class Login_window(CTk.CTkFrame):
         self.email_lable = CTk.CTkLabel(master=self, text="Почта:", font=("", 15), anchor=CTk.CENTER)
         self.email_lable.place(anchor=CTk.E, relx=0.2, rely=0.4)
 
-        self.email_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.email_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.email_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.4)
 
         self.password_lable = CTk.CTkLabel(master=self, text="Пароль:", font=("", 15), anchor=CTk.CENTER)
         self.password_lable.place(anchor=CTk.E, relx=0.2, rely=0.5)
 
-        self.password_textbox = CTk.CTkTextbox(master=self, font=("", 15), width=400, height=30)
+        self.password_textbox = CTk.CTkEntry(master=self, font=("", 15), width=400, height=30)
         self.password_textbox.place(anchor=CTk.CENTER, relx=0.5, rely=0.5)
 
 class App(CTk.CTk):
