@@ -39,9 +39,23 @@ def register_user(user: User_register, db: Session = Depends(get_db)):
         password = user.password
     )
 
-    db.add(new_user)
-    db.commit()
-    return {"message": "Пользователь успешно зарегистрирован"}
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка при сохранении пользователя")
+   
+    data = {
+        "id": new_user.id,
+        "first_name": new_user.first_name,
+        "last_name": new_user.last_name,
+        "email": new_user.email,
+        "role": new_user.role
+    }
+
+    return {"message": "Пользователь успешно зарегистрирован", "user": data}
 
 @app.post("/login/")
 def login_user(user: User_login, db: Session = Depends(get_db)):
@@ -50,7 +64,15 @@ def login_user(user: User_login, db: Session = Depends(get_db)):
     if not db_user:
         raise HTTPException(status_code=400, detail="Неверный email или пароль")
     
-    return {"message": "Успешный вход", "user_id": db_user.id, "role": db_user.role}
+    data = {
+        "id": db_user.id,
+        "first_name": db_user.first_name,
+        "last_name": db_user.last_name,
+        "email": db_user.email,
+        "role": db_user.role
+    }
+
+    return {"message": "Успешный вход", "user": data}
 
 @app.get("/")
 def read_root():
