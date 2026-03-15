@@ -22,8 +22,10 @@ class Hotels(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     location = Column(String(100), nullable=False)
+    city = Column(String(50), nullable=False)
     description = Column(String(100))
-    reting = Column(Float)
+    rating = Column(Float)
+    image_path = Column(String)
 
     rooms = relationship("Rooms", back_populates="hotels")
     bookings = relationship("Bookings", back_populates="hotels")

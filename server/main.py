@@ -1,13 +1,17 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import database
 import models
+import os
+import shutil
+import uuid
 
 models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI(title="Hotel Booking API")
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
-# Зависимость для получения сессии БД
 def get_db():
     db = database.SessionLocal()
     try:
@@ -34,9 +38,10 @@ def register_user(user: User_register, db: Session = Depends(get_db)):
     
     new_user = models.Users(
         first_name = user.first_name,
-        last_name = user.last_name,
+        last_name = user.last_name, 
         email = user.email,
-        password = user.password
+        password = user.password,
+        role = "ADMIN"
     )
 
     try:
@@ -73,6 +78,65 @@ def login_user(user: User_login, db: Session = Depends(get_db)):
     }
 
     return {"message": "Успешный вход", "user": data}
+
+@app.post("/add_hotel/")
+def add_hotel(name: str = Form(...), location: str = Form(...), city: str = Form(...), description: str = Form(...), image: UploadFile = File(...), db: Session = Depends(get_db)):
+    db_hotel = db.query(models.Hotels).filter(models.Hotels.name == name).first()
+
+    if db_hotel:
+        raise HTTPException(status_code=400, detail="Отель с таким названием уже существует")
+
+    os.makedirs("images", exist_ok=True)
+    safe_filename = f"{uuid.uuid4().hex[:8]}_{image.filename}"
+    file_path = os.path.join("images", safe_filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    new_hotel = models.Hotels(
+        name = name,
+        location = location,
+        city = city,
+        description = description,
+        image_path = file_path
+    )
+
+    try:
+        db.add(new_hotel)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка при сохранении отеля")
+
+@app.get("/search_hotels/")
+def search_hotels(city: str = Query(None), name: str = Query(None), db: Session = Depends(get_db)):
+    all_hotels = db.query(models.Hotels).all()
+
+    result = []
+    
+    for hotel in all_hotels:
+        if city:
+            if city.lower() not in hotel.city.lower():
+                continue
+
+        if name:
+            if name.lower() not in hotel.name.lower():
+                continue
+
+        min_price = "Нет номеров"
+        if hotel.rooms:
+            min_price = min([room.price for room in hotel.rooms])
+
+        result.append({
+            "id": hotel.id,
+            "name": hotel.name,
+            "city": hotel.city,
+            "rating": hotel.rating or 0.0,
+            "min_price": min_price,
+            "image_path": hotel.image_path
+        })
+
+    return result
 
 @app.get("/")
 def read_root():
