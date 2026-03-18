@@ -29,6 +29,12 @@ class User_login(BaseModel):
     email: str
     password: str
 
+class Room_add(BaseModel):
+    hotel_id: int
+    room_num: int
+    room_type: str
+    price: int
+
 @app.post("/register/")
 def register_user(user: User_register, db: Session = Depends(get_db)):
     db_user = db.query(models.Users).filter(models.Users.email == user.email).first()
@@ -108,6 +114,35 @@ def add_hotel(name: str = Form(...), location: str = Form(...), city: str = Form
         db.rollback()
         raise HTTPException(status_code=500, detail="Ошибка при сохранении отеля")
 
+@app.post("/add_room/")
+def add_room(room: Room_add, db: Session = Depends(get_db)):
+    db_room = db.query(models.Rooms).filter(models.Rooms.hotel_id == room.hotel_id, models.Rooms.room_num == room.room_num).first()
+
+    if db_room:
+        raise HTTPException(status_code=400, detail="Комната с таким номером уже есть в этом отеле")
+
+    new_room = models.Rooms(
+        hotel_id = room.hotel_id,
+        room_num = room.room_num,
+        room_type = room.room_type,
+        price = room.price,
+        is_available = True
+    )
+
+    try:
+        db.add(new_room)
+        db.commit()
+        return {"message": "Комната успешно добавлена"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Ошибка при сохранении комнаты")
+
+@app.get("/hotels_list/")
+def get_hotels_list(db: Session = Depends(get_db)):
+    hotels = db.query(models.Hotels).all()
+    
+    return [{"id": h.id, "name": h.name} for h in hotels]
+
 @app.get("/search_hotels/")
 def search_hotels(city: str = Query(None), name: str = Query(None), db: Session = Depends(get_db)):
     all_hotels = db.query(models.Hotels).all()
@@ -137,6 +172,34 @@ def search_hotels(city: str = Query(None), name: str = Query(None), db: Session 
         })
 
     return result
+
+@app.get("/hotel_details/{hotel_id}")
+def get_hotel_details(hotel_id: int, db: Session = Depends(get_db)):
+    hotel = db.query(models.Hotels).filter(models.Hotels.id == hotel_id).first()
+    
+    if not hotel:
+        raise HTTPException(status_code=404, detail="Отель не найден")
+
+    rooms_data = []
+    for room in hotel.rooms:
+        rooms_data.append({
+            "id": room.id,
+            "room_num": room.room_num,
+            "room_type": room.room_type,
+            "price": room.price,
+            "is_available": room.is_available
+        })
+
+    return {
+        "id": hotel.id,
+        "name": hotel.name,
+        "city": hotel.city,
+        "location": hotel.location,
+        "description": hotel.description,
+        "rating": hotel.rating or 0.0,
+        "image_path": hotel.image_path,
+        "rooms": rooms_data
+    }
 
 @app.get("/")
 def read_root():
