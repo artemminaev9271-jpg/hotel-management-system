@@ -3,6 +3,7 @@ import requests
 from tkinter import messagebox, filedialog
 from PIL import Image
 import io
+import datetime
 
 SERVER_URL = "http://127.0.0.1:8000"
 
@@ -27,12 +28,6 @@ class Nav_plane(CTk.CTkFrame):
 
         self.controller = controller
 
-        self.update_ui()
-
-    def update_ui(self):
-        for widget in self.winfo_children():
-            widget.destroy()
-
         self.btn_main = CTk.CTkButton(master=self, text="Главная", font=("", 15, "bold"), command=lambda: self.controller.show_frame(Main_window), anchor=CTk.CENTER)
         self.btn_main.place(anchor=CTk.CENTER, relx=0.5, rely=0.5)
 
@@ -42,32 +37,89 @@ class Nav_plane(CTk.CTkFrame):
         self.btn_search = CTk.CTkButton(master=self, text="Поиск", font=("", 15, "bold"), command=lambda: self.controller.show_frame(Search_window), anchor=CTk.CENTER)
         self.btn_search.place(anchor=CTk.CENTER, relx=0.7, rely=0.5)
 
-        if Session.is_admin():
-            self.btn_admin = CTk.CTkButton(master=self, text=("Администраторская"), font=("", 15, "bold"), command=lambda: self.controller.show_frame(Admin_window), anchor=CTk.CENTER)
-            self.btn_admin.place(anchor=CTk.CENTER, relx=0.9, rely=0.5)
-
 class Main_window(CTk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
         super().__init__(master, **kwargs)
 
         self.controller = controller
-        self.update_ui()
 
     def update_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+
         self.nav_plane = Nav_plane(self, controller=self.controller, fg_color="#2b2b2b", corner_radius=15, width=780, height=60)
         self.nav_plane.place(anchor=CTk.CENTER, relx=0.5, rely=0.06)
 
-        self.welcome_lable = CTk.CTkLabel(master=self, text="Добро пожаловать!", font=("", 26, "bold"), anchor=CTk.CENTER)
-        self.welcome_lable.place(anchor=CTk.CENTER, relx=0.5, rely=0.2)
+        user_name = Session.current_user.get("first_name") if Session.current_user else "Гость"
+        greeting = f"Добро пожаловать, {user_name}!"
+        
+        self.welcome_label = CTk.CTkLabel(self, text=greeting, font=("Arial", 28, "bold"))
+        self.welcome_label.place(anchor=CTk.CENTER, relx=0.5, rely=0.18)
 
-        self.status_lable = CTk.CTkLabel(master=self, text="Ваш статус: Classic", font=("", 17, "bold"), anchor=CTk.CENTER)
-        self.status_lable.place(anchor=CTk.W, relx=0.2, rely=0.3)
+        CTk.CTkLabel(self, text="Лучший сервис для поиска и бронирования номеров.", text_color="lightgray", font=("Arial", 16)).place(anchor=CTk.CENTER, relx=0.5, rely=0.23)
 
-        self.search_lable = CTk.CTkLabel(master=self, text="Давайте перейдём к поиску отелей!", font=("", 17, "bold"), anchor=CTk.CENTER)
-        self.search_lable.place(anchor=CTk.W, relx=0.2, rely=0.4)
+        cards_frame = CTk.CTkFrame(self, fg_color="transparent")
+        cards_frame.place(anchor=CTk.CENTER, relx=0.5, rely=0.4)
 
-        self.search_btn = CTk.CTkButton(master=self, text="К поиску", font=("", 15, "bold"), command=lambda: self.controller.show_frame(Search_window), anchor=CTk.CENTER)
-        self.search_btn.place(anchor=CTk.W, relx=0.2, rely=0.5)
+        search_card = CTk.CTkFrame(cards_frame, fg_color="#1f538d", corner_radius=15, width=320, height=120)
+        search_card.pack(side=CTk.LEFT, padx=15)
+        search_card.pack_propagate(False)
+
+        CTk.CTkLabel(search_card, text="🔍", font=("Arial", 35)).place(relx=0.06, rely=0.5, anchor=CTk.W)
+        CTk.CTkLabel(search_card, text="Поиск отелей", font=("Arial", 18, "bold")).place(relx=0.25, rely=0.3, anchor=CTk.W)
+        CTk.CTkLabel(search_card, text="Найти идеальный номер", text_color="lightgray", font=("Arial", 12)).place(relx=0.25, rely=0.55, anchor=CTk.W)
+        
+        btn_search = CTk.CTkButton(search_card, text="Перейти", fg_color="#14375e", hover_color="#0e2642", width=80, command=lambda: self.controller.show_frame(Search_window))
+        btn_search.place(relx=0.95, rely=0.5, anchor=CTk.E)
+
+        profile_card = CTk.CTkFrame(cards_frame, fg_color="#333333", corner_radius=15, width=320, height=120)
+        profile_card.pack(side=CTk.LEFT, padx=15)
+        profile_card.pack_propagate(False)
+
+        CTk.CTkLabel(profile_card, text="👤", font=("Arial", 35)).place(relx=0.06, rely=0.5, anchor=CTk.W)
+        CTk.CTkLabel(profile_card, text="Мой профиль", font=("Arial", 18, "bold")).place(relx=0.25, rely=0.3, anchor=CTk.W)
+        CTk.CTkLabel(profile_card, text="Управление бронями", text_color="lightgray", font=("Arial", 12)).place(relx=0.25, rely=0.55, anchor=CTk.W)
+        
+        btn_profile = CTk.CTkButton(profile_card, text="Открыть", fg_color="#444444", hover_color="#555555", width=80, command=lambda: self.controller.show_frame(Account_window))
+        btn_profile.place(relx=0.95, rely=0.5, anchor=CTk.E)
+
+        CTk.CTkLabel(self, text="🌟 Топ отелей по оценкам:", font=("Arial", 20, "bold")).place(anchor=CTk.W, relx=0.1, rely=0.6)
+
+        self.top_hotels_frame = CTk.CTkFrame(self, fg_color="transparent")
+        self.top_hotels_frame.place(anchor=CTk.N, relx=0.5, rely=0.65)
+
+        self.load_top_hotels()
+
+    def load_top_hotels(self):
+        try:
+            response = requests.get(f"{SERVER_URL}/top_hotels/")
+            if response.status_code == 200:
+                hotels = response.json()
+                
+                if not hotels:
+                    CTk.CTkLabel(self.top_hotels_frame, text="Отели пока не добавлены.", text_color="gray").pack()
+                    return
+
+                for h in hotels:
+                    card = CTk.CTkFrame(self.top_hotels_frame, fg_color="#2b2b2b", corner_radius=10, width=220, height=150)
+                    card.pack(side=CTk.LEFT, padx=10)
+                    card.pack_propagate(False)
+
+                    CTk.CTkLabel(card, text=f"⭐ {h['rating']}", text_color="gold", font=("Arial", 14, "bold")).pack(anchor=CTk.E, padx=10, pady=(10, 0))
+                    
+                    CTk.CTkLabel(card, text=h['name'], font=("Arial", 16, "bold"), wraplength=200).pack(anchor=CTk.W, padx=15, pady=(5, 0))
+                    CTk.CTkLabel(card, text=h['city'], text_color="lightgray", font=("Arial", 12)).pack(anchor=CTk.W, padx=15)
+                    
+                    bottom_frame = CTk.CTkFrame(card, fg_color="transparent")
+                    bottom_frame.pack(fill=CTk.X, side=CTk.BOTTOM, padx=15, pady=15)
+                    
+                    price_text = f"от {h['price']} руб." if isinstance(h['price'], int) else "Нет мест"
+                    CTk.CTkLabel(bottom_frame, text=price_text, text_color="lightgreen", font=("Arial", 14, "bold")).pack(side=CTk.LEFT)
+                    
+            else:
+                CTk.CTkLabel(self.top_hotels_frame, text="Не удалось загрузить отели.", text_color="red").pack()
+        except:
+            CTk.CTkLabel(self.top_hotels_frame, text="Нет связи с сервером.", text_color="gray").pack()
 
 class Search_window(CTk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
@@ -208,7 +260,36 @@ class Hotel_details_window(CTk.CTkFrame):
         self.rooms_frame = CTk.CTkFrame(self.main_scroll, fg_color="transparent")
         self.rooms_frame.pack(fill=CTk.X, padx=20, pady=10)
 
+        CTk.CTkLabel(self.main_scroll, text="─" * 100, text_color="gray").pack(pady=20)
+
+        CTk.CTkLabel(self.main_scroll, text="Отзывы посетителей:", font=("Arial", 20, "bold")).pack(anchor=CTk.W, padx=20)
+
+        self.reviews_frame = CTk.CTkFrame(self.main_scroll, fg_color="transparent")
+        self.reviews_frame.pack(fill=CTk.X, padx=20, pady=10)
+
+        self.add_review_frame = CTk.CTkFrame(self.main_scroll, fg_color="#333333", corner_radius=10)
+        self.add_review_frame.pack(fill=CTk.X, padx=20, pady=20)
+
+        CTk.CTkLabel(self.add_review_frame, text="Оставить свой отзыв", font=("Arial", 16, "bold")).pack(anchor=CTk.W, padx=15, pady=(10, 5))
+
+        score_frame = CTk.CTkFrame(self.add_review_frame, fg_color="transparent")
+        score_frame.pack(fill=CTk.X, padx=15)
+
+        CTk.CTkLabel(score_frame, text="Оценка: ", font=("", 14)).pack(side=CTk.LEFT)
+
+        self.rating_combo = CTk.CTkOptionMenu(score_frame, values=["5", "4", "3", "2", "1"], width=80)
+        self.rating_combo.pack(side=CTk.LEFT, padx=10)
+        self.rating_combo.set("5")
+
+        self.comment_textbox = CTk.CTkTextbox(self.add_review_frame, height=80)
+        self.comment_textbox.pack(fill=CTk.X, padx=15, pady=10)
+
+        self.submit_review_btn = CTk.CTkButton(self.add_review_frame, text="Отправить отзыв", fg_color="#1f538d", command=self.submit_review)
+        self.submit_review_btn.pack(anchor=CTk.E, padx=15, pady=(0, 15))
+
     def load_hotel_data(self, hotel_id):
+        self.current_hotel_id = hotel_id
+
         for widget in self.rooms_frame.winfo_children():
             widget.destroy()
             
@@ -253,7 +334,59 @@ class Hotel_details_window(CTk.CTkFrame):
                 btn_text = "Забронировать" if room['is_available'] else "Занят"
                 btn_color = "#1f538d" if room['is_available'] else "gray"
 
-                CTk.CTkButton(room_card, text=btn_text, state=state, fg_color=btn_color, command=lambda r_id=room['id']: self.book_room(r_id)).pack(side=CTk.RIGHT, padx=15)
+                CTk.CTkButton(room_card, text=btn_text, state=state, fg_color=btn_color, command=lambda r_id=room['id'], r_price=room['price']: self.book_room(r_id, hotel["id"], r_price)).pack(side=CTk.RIGHT, padx=15)
+
+        for widget in self.reviews_frame.winfo_children():
+            widget.destroy()
+
+        reviews = hotel.get("reviews", [])
+        if not reviews:
+            CTk.CTkLabel(self.reviews_frame, text="Пока нет отзывов. Будьте первым!", text_color="gray").pack(pady=10)
+        else:
+            for rev in reviews:
+                rev_card = CTk.CTkFrame(self.reviews_frame, fg_color="#2b2b2b", corner_radius=8)
+                rev_card.pack(fill=CTk.X, pady=5)
+
+                header_text = f"👤 {rev['author']}   •   📅 {rev['created_at']}"
+                CTk.CTkLabel(rev_card, text=header_text, text_color="lightgray", font=("Arial", 12)).pack(anchor=CTk.W, padx=15, pady=(10, 0))
+
+                CTk.CTkLabel(rev_card, text=f"{'⭐' * int(rev['rating'])} ({rev['rating']}/5.0)", text_color="gold").pack(anchor=CTk.W, padx=15)
+
+                if rev['comment']:
+                    CTk.CTkLabel(rev_card, text=rev['comment'], justify="left", wraplength=650, font=("Arial", 14)).pack(anchor=CTk.W, padx=15, pady=(5, 10))
+
+    def submit_review(self):
+        if not Session.current_user:
+            messagebox.showerror("Ошибка", "Только авторизованные пользователи могут оставлять отзывы!")
+            return
+
+        comment = self.comment_textbox.get("0.0", "end").strip()
+        if not comment:
+            messagebox.showwarning("Внимание", "Напишите текст отзыва!")
+            return
+
+        rating = float(self.rating_combo.get())
+
+        data = {
+            "user_id": Session.current_user.get("id"),
+            "hotel_id": self.current_hotel_id,
+            "rating": rating,
+            "comment": comment
+        }
+
+        try:
+            response = requests.post(f"{SERVER_URL}/add_review/", json=data)
+            if response.status_code == 200:
+                messagebox.showinfo("Успешно", "Спасибо за ваш отзыв!")
+                
+                self.comment_textbox.delete("0.0", "end")
+                self.rating_combo.set("5")
+                
+                self.load_hotel_data(self.current_hotel_id)
+            else:
+                messagebox.showerror("Ошибка", response.json().get("detail", "Ошибка при отправке"))
+        except requests.exceptions.ConnectionError:
+             messagebox.showerror("Ошибка", "Сервер недоступен!")
 
     def get_large_image(self, image_path):
         if not image_path: return None
@@ -267,8 +400,65 @@ class Hotel_details_window(CTk.CTkFrame):
             pass
         return None
 
-    def book_room(self, room_id):
-        print(f"Пользователь хочет забронировать комнату ID: {room_id}")
+    def book_room(self, room_id, hotel_id, room_price):
+        popup = CTk.CTkToplevel(self)
+        popup.geometry("350x400")
+        popup.title("Оформление брони")
+        popup.attributes("-topmost", True)
+        popup.focus_force()
+
+        CTk.CTkLabel(popup, text="Укажите даты проживания", font=("Arial", 18, "bold")).pack(pady=20)
+
+        CTk.CTkLabel(popup, text="Дата заезда (ГГГГ-ММ-ДД):", font=("", 14)).pack(pady=(10, 0))
+        in_date_entry = CTk.CTkEntry(popup, font=("", 14), placeholder_text="Например: 2024-05-10", width=200)
+        in_date_entry.pack(pady=5)
+
+        CTk.CTkLabel(popup, text="Дата выезда (ГГГГ-ММ-ДД):", font=("", 14)).pack(pady=(10, 0))
+        out_date_entry = CTk.CTkEntry(popup, font=("", 14), placeholder_text="Например: 2024-05-15", width=200)
+        out_date_entry.pack(pady=5)
+
+        CTk.CTkLabel(popup, text=f"Цена номера: {room_price} руб/сутки", text_color="lightgreen").pack(pady=10)
+
+        def submit_booking():
+            if not Session.current_user:
+                messagebox.showerror("Ошибка", "Вы не авторизованы! Пожалуйста, войдите в аккаунт.", parent=popup)
+                return
+
+            user_id = Session.current_user.get("id") 
+            
+            in_str = in_date_entry.get().strip()
+            out_str = out_date_entry.get().strip()
+
+            try:
+                datetime.datetime.strptime(in_str, "%Y-%m-%d")
+                datetime.datetime.strptime(out_str, "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Ошибка", "Неверный формат даты! Используйте ГГГГ-ММ-ДД", parent=popup)
+                return
+
+            data = {
+                "user_id": user_id,
+                "hotel_id": hotel_id,
+                "room_id": room_id,
+                "in_date": in_str,
+                "out_date": out_str
+            }
+
+            try:
+                response = requests.post(f"{SERVER_URL}/book_room/", json=data)
+                if response.status_code == 200:
+                    result = response.json()
+                    total = result.get("total_price")
+                    messagebox.showinfo("Успех", f"Бронь успешно оформлена!\nИтоговая сумма: {total} руб.", parent=popup)
+                    popup.destroy()
+                else:
+                    error_msg = response.json().get("detail", "Неизвестная ошибка")
+                    messagebox.showerror("Ошибка бронирования", error_msg, parent=popup)
+            except requests.exceptions.ConnectionError:
+                messagebox.showerror("Ошибка", "Сервер недоступен!", parent=popup)
+
+        btn_confirm = CTk.CTkButton(popup, text="Подтвердить бронь", fg_color="green", hover_color="darkgreen", command=submit_booking)
+        btn_confirm.pack(pady=20)
 
     def go_back(self):
         self.controller.show_frame(Search_window)
@@ -278,7 +468,6 @@ class Account_window(CTk.CTkFrame):
         super().__init__(master, **kwargs)
 
         self.controller = controller
-        self.update_ui()
 
     def update_ui(self):
         for widget in self.winfo_children():
@@ -287,23 +476,121 @@ class Account_window(CTk.CTkFrame):
         self.nav_plane = Nav_plane(self, controller=self.controller, fg_color="#2b2b2b", corner_radius=15, width=780, height=60)
         self.nav_plane.place(anchor=CTk.CENTER, relx=0.5, rely=0.06)
 
-        if Session.is_user():
-            self.lable = CTk.CTkLabel(master=self, text=f"Добро пожаловать {Session.current_user.get('first_name')}!", font=("", 23, "bold"), anchor=CTk.CENTER)
-            self.lable.place(anchor=CTk.CENTER, relx=0.5, rely=0.3)
-
-        elif Session.is_admin():
-            self.lable = CTk.CTkLabel(master=self, text=f"Добро пожаловать {Session.current_user.get('first_name')}!\n Вы админ!", font=("", 23, "bold"), anchor=CTk.CENTER)
-            self.lable.place(anchor=CTk.CENTER, relx=0.5, rely=0.3)
-
+        if not Session.current_user:
+            self.draw_guest_interface()
         else:
-            self.lable = CTk.CTkLabel(master=self, text="Вы ещё не вошли в аккаунт.\n Пожалуйста, выберите действае ниже", font=("", 23, "bold"), anchor=CTk.CENTER)
-            self.lable.place(anchor=CTk.CENTER, relx=0.5, rely=0.3)
+            self.draw_user_interface()
 
-            self.button = CTk.CTkButton(master=self, text="Войти", font=("", 15, "bold"), command=lambda: self.controller.show_frame(Login_window), anchor=CTk.CENTER)
-            self.button.place(anchor=CTk.CENTER, relx=0.4, rely=0.4)
 
-            self.button = CTk.CTkButton(master=self, text="Зарегистрироваться", font=("", 15, "bold"), command=lambda: self.controller.show_frame(Register_window), anchor=CTk.CENTER)
-            self.button.place(anchor=CTk.CENTER, relx=0.6, rely=0.4)
+    def draw_guest_interface(self):
+        card = CTk.CTkFrame(self, fg_color="#333333", corner_radius=15, width=400, height=250)
+        card.place(anchor=CTk.CENTER, relx=0.5, rely=0.45)
+        card.pack_propagate(False)
+
+        CTk.CTkLabel(card, text="🔒", font=("Arial", 50)).pack(pady=(20, 0))
+        CTk.CTkLabel(card, text="Вы не авторизованы", font=("Arial", 22, "bold")).pack(pady=(10, 5))
+        CTk.CTkLabel(card, text="Войдите в аккаунт, чтобы бронировать номера\nи оставлять отзывы.", text_color="lightgray", font=("Arial", 14)).pack(pady=(0, 20))
+
+        btn_frame = CTk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack()
+
+        CTk.CTkButton(btn_frame, text="Вход", width=120, font=("Arial", 14, "bold"), command=lambda: self.controller.show_frame(Login_window)).pack(side=CTk.LEFT, padx=10)
+        
+        CTk.CTkButton(btn_frame, text="Регистрация", width=150, fg_color="#444444", hover_color="#555555", font=("Arial", 14, "bold"), command=lambda: self.controller.show_frame(Register_window)).pack(side=CTk.LEFT, padx=10)
+
+
+    def draw_user_interface(self):
+        user = Session.current_user
+        
+        profile_card = CTk.CTkFrame(self, fg_color="#333333", corner_radius=15, width=260, height=450)
+        profile_card.place(relx=0.05, rely=0.15, anchor=CTk.NW)
+        profile_card.pack_propagate(False)
+
+        avatar_bg = CTk.CTkFrame(profile_card, fg_color="#1f538d", width=80, height=80, corner_radius=40)
+        avatar_bg.pack(pady=(30, 10))
+        avatar_bg.pack_propagate(False)
+        initial = user.get('first_name', '?')[0].upper()
+        CTk.CTkLabel(avatar_bg, text=initial, font=("Arial", 36, "bold"), text_color="white").place(relx=0.5, rely=0.5, anchor=CTk.CENTER)
+
+        full_name = f"{user.get('first_name')} {user.get('last_name')}"
+        CTk.CTkLabel(profile_card, text=full_name, font=("Arial", 20, "bold"), wraplength=250).pack(pady=(10, 5))
+        
+        CTk.CTkLabel(profile_card, text=f"📧 {user.get('email')}", text_color="lightgray", font=("Arial", 14)).pack(pady=(0, 20))
+
+        CTk.CTkLabel(profile_card, text="─" * 40, text_color="gray").pack()
+
+        if Session.is_admin():
+            CTk.CTkLabel(profile_card, text="👑 Администратор", text_color="gold", font=("Arial", 16, "bold")).pack(pady=15)
+            CTk.CTkButton(profile_card, text="Панель управления", fg_color="#b8860b", hover_color="#8b6508",command=lambda: self.controller.show_frame(Admin_window)).pack(pady=5)
+        else:
+            CTk.CTkLabel(profile_card, text="👤 Клиент", text_color="lightblue", font=("Arial", 16, "bold")).pack(pady=15)
+
+        CTk.CTkButton(profile_card, text="Выйти из аккаунта", fg_color="#8b0000", hover_color="#660000", command=self.logout).pack(side=CTk.BOTTOM, pady=20)
+
+
+        info_frame = CTk.CTkFrame(self, fg_color="transparent", width=420, height=450)
+        info_frame.place(relx=0.41, rely=0.15, anchor=CTk.NW)
+        info_frame.pack_propagate(False)
+
+        CTk.CTkLabel(info_frame, text="Мои бронирования", font=("Arial", 22, "bold")).pack(anchor=CTk.W, pady=(0, 15))
+
+        self.bookings_scroll = CTk.CTkScrollableFrame(info_frame, fg_color="#2b2b2b", corner_radius=10, width=390, height=380)
+        self.bookings_scroll.pack(fill=CTk.BOTH, expand=True)
+
+        self.load_user_bookings()
+
+
+    def load_user_bookings(self):
+        for widget in self.bookings_scroll.winfo_children():
+            widget.destroy()
+
+        user_id = Session.current_user.get("id")
+
+        try:
+            response = requests.get(f"{SERVER_URL}/my_bookings/{user_id}")
+            
+            if response.status_code == 200:
+                bookings = response.json()
+
+                if not bookings:
+                    CTk.CTkLabel(self.bookings_scroll, text="У вас пока нет активных бронирований.\nСамое время найти отличный отель! 🏨", text_color="gray", font=("Arial", 15)).pack(pady=50)
+                    
+                    btn = CTk.CTkButton(self.bookings_scroll, text="Перейти к поиску", command=lambda: self.controller.show_frame(Search_window))
+                    btn.pack(pady=10)
+                    return
+
+                for b in bookings:
+                    card = CTk.CTkFrame(self.bookings_scroll, fg_color="#444444", corner_radius=8)
+                    card.pack(fill=CTk.X, pady=5, padx=5)
+
+                    top_frame = CTk.CTkFrame(card, fg_color="transparent")
+                    top_frame.pack(fill=CTk.X, padx=10, pady=(10, 0))
+                    
+                    CTk.CTkLabel(top_frame, text=f"🏨 {b['hotel_name']} ({b['city']})", font=("Arial", 16, "bold")).pack(side=CTk.LEFT)
+                    
+                    status_color = "lightgreen" if "Активна" in b['status'] else "gray"
+                    CTk.CTkLabel(top_frame, text=b['status'], text_color=status_color, font=("Arial", 14, "bold")).pack(side=CTk.RIGHT)
+
+                    CTk.CTkLabel(card, text=f"📅 {b['in_date']} — {b['out_date']}", text_color="lightgray").pack(anchor=CTk.W, padx=10, pady=2)
+
+                    bottom_frame = CTk.CTkFrame(card, fg_color="transparent")
+                    bottom_frame.pack(fill=CTk.X, padx=10, pady=(5, 10))
+
+                    CTk.CTkLabel(bottom_frame, text=f"🚪 Номер: {b['room_num']} ({b['room_type']})").pack(side=CTk.LEFT)
+                    CTk.CTkLabel(bottom_frame, text=f"💵 {b['total_price']} руб.", text_color="gold", font=("Arial", 16, "bold")).pack(side=CTk.RIGHT)
+
+            else:
+                messagebox.showerror("Ошибка", f"Не удалось загрузить историю броней. Код: {response.status_code}")
+                
+        except requests.exceptions.ConnectionError:
+            CTk.CTkLabel(self.bookings_scroll, text="Сервер недоступен", text_color="red").pack(pady=20)
+
+
+    def logout(self):
+        confirm = messagebox.askyesno("Выход", "Вы уверены, что хотите выйти из аккаунта?")
+        if confirm:
+            Session.current_user = None
+            self.update_ui()
 
 class Register_window(CTk.CTkFrame):
     def __init__(self, master, controller, **kwargs):
@@ -435,6 +722,12 @@ class Admin_window(CTk.CTkFrame):
 
         self.controller = controller
 
+        self.update_ui()
+
+    def update_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+
         self.nav_plane = Nav_plane(self, controller=self.controller, fg_color="#2b2b2b", corner_radius=15, width=780, height=60)
         self.nav_plane.place(anchor=CTk.CENTER, relx=0.5, rely=0.06)
 
@@ -449,6 +742,12 @@ class Add_hotel_window(CTk.CTkFrame):
         super().__init__(master, **kwargs)
 
         self.controller = controller
+
+        self.update_ui()
+
+    def update_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
 
         self.nav_plane = Nav_plane(self, controller=self.controller, fg_color="#2b2b2b", corner_radius=15, width=780, height=60)
         self.nav_plane.place(anchor=CTk.CENTER, relx=0.5, rely=0.06)
@@ -573,7 +872,6 @@ class Add_room_window(CTk.CTkFrame):
         self.btn_submit = CTk.CTkButton(master=self, text="Добавить комнату", font=("", 15, "bold"), command=self.save_room)
         self.btn_submit.place(anchor=CTk.CENTER, relx=0.5, rely=0.8)
 
-
     def update_ui(self):
         try:
             response = requests.get(f"{SERVER_URL}/hotels_list/")
@@ -598,7 +896,6 @@ class Add_room_window(CTk.CTkFrame):
                 messagebox.showerror("Ошибка", "Не удалось загрузить список отелей")
         except requests.exceptions.ConnectionError:
              messagebox.showerror("Ошибка", "Сервер недоступен!")
-
 
     def save_room(self):
         selected_hotel_str = self.hotel_combo.get()
