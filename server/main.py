@@ -11,6 +11,7 @@ import uuid
 
 models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI(title="Hotel Booking API")
+os.makedirs("images", exist_ok=True)
 app.mount("/images", StaticFiles(directory="images"), name="images")
 
 def get_db():

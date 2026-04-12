@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Float, Date, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from database import Base, engine
+from database import Base
 
 class Users(Base):
     __tablename__ = "users"
@@ -72,5 +72,3 @@ class Reviews(Base):
 
     hotels = relationship("Hotels", back_populates="reviews")
     users = relationship("Users", back_populates="reviews")
-
-Base.metadata.create_all(bind=engine)
